@@ -68,6 +68,21 @@ def make_tasks(train_y, test_y, n_tasks, seed):
     return tasks, order
 
 
+def make_tasks_dil(train_dom, test_dom, n_classes, seed):
+    """Domain-incremental: task t = domain t (same label space every task).
+
+    Domain order is seeded; 'classes' is the full label set so the seen-class
+    mask is all-True from task 1 — forgetting here is pure domain interference,
+    no logit suppression."""
+    doms = np.unique(np.asarray(train_dom))
+    order = np.random.default_rng(seed).permutation(doms)
+    all_cls = np.arange(n_classes)
+    tr_d = np.asarray(train_dom); te_d = np.asarray(test_dom)
+    return [{'classes': all_cls,
+             'train_idx': np.where(tr_d == d)[0],
+             'test_idx': np.where(te_d == d)[0]} for d in order], order
+
+
 # ---------------------------------------------------------------- head / loss
 def init_head(key, dim, n_classes):
     return {'w': 0.01 * jr.normal(key, (dim, n_classes)), 'b': jnp.zeros(n_classes)}
@@ -286,6 +301,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--features', default='/ptmp/cheins/data/cifar100_dinov2s14.npz')
     ap.add_argument('--synthetic', action='store_true')
+    ap.add_argument('--scenario', choices=['cil', 'dil'], default='cil',
+                    help='dil: tasks = domains from train_dom/test_dom in the npz')
     ap.add_argument('--methods', default='adamw,adamw-ewc,ivon,ivon-cl,evon-cl')
     ap.add_argument('--n-tasks', type=int, default=10)
     ap.add_argument('--epochs', type=int, default=20)
@@ -302,10 +319,18 @@ def main():
     feats_tr = (feats_tr - mu) / sd; feats_te = (feats_te - mu) / sd
     print(f'features: train {feats_tr.shape} test {feats_te.shape}', flush=True)
 
+    doms = None
+    if args.scenario == 'dil':
+        dd = np.load(args.features)
+        doms = (dd['train_dom'], dd['test_dom'])
+
     overrides = json.loads(args.hp)
     all_runs = []
     for seed in [int(s) for s in args.seeds.split(',')]:
-        tasks, order = make_tasks(ytr, yte, args.n_tasks, seed)
+        if args.scenario == 'dil':
+            tasks, order = make_tasks_dil(doms[0], doms[1], int(ytr.max()) + 1, seed)
+        else:
+            tasks, order = make_tasks(ytr, yte, args.n_tasks, seed)
         for method in args.methods.split(','):
             hp = dict(DEFAULT_HP[method]); hp.update(overrides.get(method, {}))
             t0 = time.time()

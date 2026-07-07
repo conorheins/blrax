@@ -44,3 +44,19 @@ higher.
 
 Sweeps: `run_cl_sweep.sbatch` (b2 x lr x tau grid), `run_cl_sweep2.sbatch`
 (lr/clip/epochs polish). Full per-task R matrices in the JSONs.
+
+## Extension: four-benchmark suite (Jul 7)
+Added (a) rotated-CIFAR-10 domain-incremental (`--scenario dil`, 5 rotation
+domains via extract_dil_and_inr.py), (c) Split ImageNet-R 10x20 CIL (Berkeley
+tar -> 80/20 per-class split), and (b) LoRA-backbone CL (`cl_lora.py`: rank-8
+LoRA on DINOv2 attention via equimo.finetune + head, same VCL recursion over
+the LoRA+head pytree). Summary in cl_four_benchmarks.csv / cl_summary_figure.png.
+
+Key extra findings: DIL — forgetting eliminated (9.1->0.35) at the joint
+ceiling, Bayes ~ EWC (interference too mild to separate them); ImageNet-R —
+CIL story replicates at higher difficulty (Bayes 58 vs AdamW 18, EVON-CL >
+IVON-CL for the first time); LoRA — IVON diverges without clip_radius
+(0.003-0.01) through the deep backbone, and with it Bayes-CL reaches 22.8 vs
+AdamW 8.6 at 10 tasks, but diagonal weight-space priors cannot fully protect
+adapted features (raising h0 makes it WORSE: 45.6 -> 28.5 -> 19.7 at 5 tasks
+for h0 0.5/2/5) — per-task adapters or prototype hybrids are the known fix.
