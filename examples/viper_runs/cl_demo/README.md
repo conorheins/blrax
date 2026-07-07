@@ -60,3 +60,21 @@ IVON-CL for the first time); LoRA — IVON diverges without clip_radius
 AdamW 8.6 at 10 tasks, but diagonal weight-space priors cannot fully protect
 adapted features (raising h0 makes it WORSE: 45.6 -> 28.5 -> 19.7 at 5 tasks
 for h0 0.5/2/5) — per-task adapters or prototype hybrids are the known fix.
+
+## Extension 2: PermutedMNIST from-scratch (Jul 7) — recursion vs posterior merging
+`cl_permuted_mnist.py`: classic VCL benchmark (10 random-permutation tasks,
+2x100 single-head MLP, replay-free, full 60k/task, 30 ep, 3 seeds). Includes
+'scratch-merge' — Dimitrije's strategy of training an independent IVON
+posterior per task and fusing them per-parameter (BMR / Fisher-merge algebra).
+Results: scratch-merge 12.5±2.6 (chance; weight-permutation symmetry breaks
+per-parameter correspondence across independent runs) vs ivon-cl 79.5±0.8
+(forgetting 6.2) — above published VCL (78±4 on -Hard; 100 ep) and above
+CoVON's plain IVON-VCL ablation (77.0). CoVON-lr-schedule variant
+(results_cl_pmnist100_covon2.json; official-IVON lrs rescaled by (h0+delta)
+for blrax): 79.9±1.3 with LA 95.9 / forgetting 17 — a different point on the
+plasticity/retention frontier, same net ACC. Published anchors at this arch:
+VCL 78, VCL+coreset 81, UCB 83, TD-VCL 88-89, CoVON 92.1 (IVON-based,
+arXiv 2606.24007 — gap to 88-92 = n-step KL / fast-slow merging machinery,
+both published extensions of exactly this recursion). NOTE: the raw-lr
+covon-style file (results_cl_pmnist100_covonstyle.json) diverged — official
+PyTorch IVON rescales lr by (h0+delta), blrax rescale_lr=False does not.
